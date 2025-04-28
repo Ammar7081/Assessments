@@ -438,21 +438,22 @@
             const MAX_TAB_CHANGES = 2; // Maximum allowed tab changes
 
             // Quiz data
+            // Quiz data
             let quizData = [
                 {
                     question: "Which number should be there next in this series? 25, 24, 22, 19, 15?",
                     options: ["14", "10", "5", "30"],
-                    correct: 2
+                    correct: 1 // "10" is correct
                 },
                 {
                     question: "Which one of the five is least like the other four?",
                     options: ["Snake", "Cow", "Dog", "Tiger"],
-                    correct: 1
+                    correct: 0 // "Snake" is correct
                 },
                 {
                     question: "If you rearrange the letters (BARBIT) you would have the name of",
                     options: ["Animal", "Ocean", "Country", "State"],
-                    correct: 1
+                    correct: 1 // 🛑 This question might be wrong
                 },
                 {
                     question: "Who painted the Mona Lisa?",
@@ -464,7 +465,6 @@
                     options: ["Ag", "Fe", "Au", "Cu"],
                     correct: 2
                 }
-                
             ];
 
             // Load quiz data from localStorage
