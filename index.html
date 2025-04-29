@@ -193,6 +193,29 @@
             line-height: 1.6;
         }
 
+        .result-details {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .result-message {
+            font-size: 1.5rem;
+            font-weight: 500;
+            margin-bottom: 1rem;
+        }
+
+        .score-breakdown {
+            background-color: #f8f9fa;
+            padding: 1rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .score-breakdown p {
+            margin-bottom: 0.5rem;
+        }
+
         @media (max-width: 768px) {
             .container {
                 padding: 1.5rem;
@@ -344,6 +367,30 @@
             color: white;
             border: none;
         }
+
+        .quiz-selection {
+            display: grid;
+            gap: 1.2rem;
+            margin: 2rem 0;
+        }
+
+        .quiz-option {
+            padding: 1.2rem;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background-color: white;
+            font-size: 1.1rem;
+            color: #2c3e50;
+            text-align: left;
+        }
+
+        .quiz-option:hover {
+            background-color: #f8f9fa;
+            border-color: #4CAF50;
+            transform: translateX(5px);
+        }
     </style>
 </head>
 <body>
@@ -380,24 +427,24 @@
         <!-- Welcome Screen -->
         <div class="section active" id="welcome-screen">
             <h1>Welcome to the Quiz!</h1>
-            <p>Test your knowledge with our interactive quiz. You'll be presented with multiple-choice questions. Select the correct answer and see how well you do!</p>
-            <button class="btn" onclick="startQuiz()">Start Quiz</button>
+            <p>Please select a quiz to begin:</p>
+            <div class="quiz-selection">
+                <button class="quiz-option" onclick="selectQuiz('general')">General Knowledge Quiz</button>
+                <button class="quiz-option" onclick="selectQuiz('xircon')">XIRCON HOMES - NEW EMPLOYEE KNOWLEDGE QUIZ</button>
+            </div>
         </div>
 
         <!-- Quiz Questions -->
-        <div class="section" id="quiz-screen">
-            <div class="progress-bar">
-                <div class="progress" id="progress"></div>
-            </div>
-            <div id="tab-warning" style="display: none; background-color: #fff3cd; color: #856404; padding: 10px; border-radius: 5px; margin: 10px 0; text-align: center;"></div>
-            <div class="timer-container">
-                <div class="timer" id="timer">30</div>
-            </div>
+        <div class="section" id="quiz-section">
             <div class="question-container">
-                <h2 id="question">Loading questions...</h2>
+                <div id="timer-container">Time left: <span id="timer">30</span>s</div>
+                <h2 id="question"></h2>
                 <div class="options" id="options">
                     <!-- Options will be dynamically added here -->
                 </div>
+            </div>
+            <div class="progress-bar">
+                <div class="progress" id="progress"></div>
             </div>
             <button class="btn" id="next-btn" onclick="nextQuestion()">Next Question</button>
         </div>
@@ -406,54 +453,53 @@
         <div class="section" id="result-screen">
             <h1>Quiz Completed!</h1>
             <div class="score">Your Score: <span id="final-score">0</span></div>
-            <p id="result-message">Great job!</p>
+            <div id="result-message"></div>
             <button class="btn" onclick="restartQuiz()">Try Again</button>
         </div>
     </div>
 
     <script>
+        // Wait for DOM to be fully loaded
         document.addEventListener('DOMContentLoaded', function() {
+            // Clear existing quiz data
+            localStorage.removeItem('quizData');
+
             // DOM elements
             const questionElement = document.getElementById('question');
             const optionsElement = document.getElementById('options');
             const nextButton = document.getElementById('next-btn');
             const progressBar = document.getElementById('progress');
-            const finalScoreElement = document.getElementById('final-score');
-            const resultMessageElement = document.getElementById('result-message');
-            const welcomeScreen = document.getElementById('welcome-screen');
-            const quizScreen = document.getElementById('quiz-screen');
-            const resultScreen = document.getElementById('result-screen');
-            const startButton = document.querySelector('.btn[onclick="startQuiz()"]');
+            const timerElement = document.getElementById('timer');
+            const scoreElement = document.getElementById('final-score');
+            const resultMessage = document.getElementById('result-message');
 
             // Quiz state variables
             let currentQuestion = 0;
             let score = 0;
-            let selectedAnswers = [];
             let selectedOption = null;
+            let selectedAnswers = [];
             let timer;
-            let timeLeft;
-            const TIME_PER_QUESTION = 30; // seconds per question
             let isQuizActive = false;
             let tabChangeCount = 0;
-            const MAX_TAB_CHANGES = 2; // Maximum allowed tab changes
+            let currentQuizKey = '';
+            const MAX_TAB_CHANGES = 2;
 
-            // Quiz data
-            // Quiz data
-            let quizData = [
+            // Initialize quiz data
+            const defaultQuizData = [
                 {
-                    question: "Which number should be there next in this series? 25, 24, 22, 19, 15?",
-                    options: ["14", "10", "5", "30"],
-                    correct: 1 // "10" is correct
+                    question: "What is the capital of France?",
+                    options: ["London", "Berlin", "Paris", "Madrid"],
+                    correct: 2
                 },
                 {
-                    question: "Which one of the five is least like the other four?",
-                    options: ["Snake", "Cow", "Dog", "Tiger"],
-                    correct: 0 // "Snake" is correct
+                    question: "Which planet is known as the Red Planet?",
+                    options: ["Venus", "Mars", "Jupiter", "Saturn"],
+                    correct: 1
                 },
                 {
-                    question: "If you rearrange the letters (BARBIT) you would have the name of",
-                    options: ["Animal", "Ocean", "Country", "State"],
-                    correct: 0 // 🛑 This question might be wrong
+                    question: "What is 2 + 2?",
+                    options: ["3", "4", "5", "6"],
+                    correct: 1
                 },
                 {
                     question: "Who painted the Mona Lisa?",
@@ -461,402 +507,612 @@
                     correct: 2
                 },
                 {
-                    question: "What is the chemical symbol for gold?",
-                    options: ["Ag", "Fe", "Au", "Cu"],
+                    question: "Which element has the chemical symbol 'Au'?",
+                    options: ["Silver", "Gold", "Copper", "Aluminum"],
+                    correct: 1
+                },
+                {
+                    question: "What is the largest planet in our solar system?",
+                    options: ["Mars", "Saturn", "Jupiter", "Neptune"],
+                    correct: 2
+                },
+                {
+                    question: "Who wrote 'Romeo and Juliet'?",
+                    options: ["Charles Dickens", "William Shakespeare", "Jane Austen", "Mark Twain"],
+                    correct: 1
+                },
+                {
+                    question: "What is the largest organ in the human body?",
+                    options: ["Heart", "Brain", "Liver", "Skin"],
+                    correct: 3
+                },
+                {
+                    question: "Which country is home to the kangaroo?",
+                    options: ["New Zealand", "South Africa", "Australia", "Brazil"],
+                    correct: 2
+                },
+                {
+                    question: "What is the hardest natural substance on Earth?",
+                    options: ["Gold", "Iron", "Diamond", "Platinum"],
                     correct: 2
                 }
             ];
 
-            // Load quiz data from localStorage
-            function loadQuizData() {
-                const savedData = localStorage.getItem('quizData');
-                if (savedData) {
-                    try {
-                        const parsedData = JSON.parse(savedData);
-                        if (Array.isArray(parsedData) && parsedData.length > 0) {
-                            quizData = parsedData;
-                        }
-                    } catch (e) {
-                        console.error('Error loading quiz data:', e);
-                    }
+            // Initialize Xircon quiz data structure
+            const xirconQuizData = [
+                {
+                    question: "What are Xircon Homes' core offerings?",
+                    options: [
+                        "Standard custom homes only",
+                        "Full custom homes only",
+                        "Standard custom, full custom, and pre-designed custom homes",
+                        "Apartment buildings and townhouses"
+                    ],
+                    correct: 2
+                },
+                {
+                    question: "What is Xircon Homes' primary focus in Western Melbourne?",
+                    options: [
+                        "Apartment developments",
+                        "Commercial construction",
+                        "Greenfield developments",
+                        "Renovation projects"
+                    ],
+                    correct: 2
+                },
+                {
+                    question: "What is Xircon Homes' primary focus in South East Melbourne?",
+                    options: [
+                        "Knockdown rebuild projects",
+                        "Heritage restoration",
+                        "High-density apartments",
+                        "Commercial buildings"
+                    ],
+                    correct: 0
+                },
+                {
+                    question: "What is the service area radius for Xircon Homes from Melbourne CBD?",
+                    options: ["25km", "50km", "75km", "100km"],
+                    correct: 1
+                },
+                {
+                    question: "In Xircon's building process, what happens during the 'New Home Selection' step?",
+                    options: [
+                        "Interior design consultation and material selection",
+                        "Initial consultation, preliminary design, and quotation",
+                        "Contract signing",
+                        "Tender preparation"
+                    ],
+                    correct: 1
+                },
+                {
+                    question: "In Xircon's knockdown rebuild process, who is responsible for engaging the demolition contractor?",
+                    options: [
+                        "Xircon Homes",
+                        "The client",
+                        "The local council",
+                        "A third-party project manager"
+                    ],
+                    correct: 1
+                },
+                {
+                    question: "What is the typical deposit structure for a Xircon home build?",
+                    options: [
+                        "10% upfront payment",
+                        "5% deposit (split between initial, tender, and contract signing)",
+                        "20% deposit before construction begins",
+                        "Equal monthly payments throughout construction"
+                    ],
+                    correct: 1
+                },
+                {
+                    question: "What happens during Xircon's 'Tender' stage of the building process?",
+                    options: [
+                        "Land is purchased",
+                        "Construction begins",
+                        "Formulation of detailed pricing and specification documentation",
+                        "Council approvals are finalized"
+                    ],
+                    correct: 2
+                },
+                {
+                    question: "What client action is required after the 'Practical Completion' stage at Xircon?",
+                    options: [
+                        "Final inspection of the property",
+                        "Payment of outstanding balance",
+                        "Approval of landscaping plans",
+                        "Signing an occupancy agreement"
+                    ],
+                    correct: 0
+                },
+                {
+                    question: "What happens during Xircon's 'Interior Design and Selections' stage?",
+                    options: [
+                        "Virtual reality home tour",
+                        "Cost estimation only",
+                        "Color consultation and material selection",
+                        "Floor plan adjustments"
+                    ],
+                    correct: 2
+                },
+                {
+                    question: "What is the client's responsibility during the 'Post Contract' phase at Xircon?",
+                    options: [
+                        "Supervising construction crews",
+                        "Coordinating with neighbors",
+                        "Providing necessary information for permit applications",
+                        "Ordering construction materials"
+                    ],
+                    correct: 2
+                },
+                {
+                    question: "What special document must be obtained before a knockdown rebuild can commence?",
+                    options: [
+                        "Real estate transfer deed",
+                        "Demolition permit and asbestos clearance",
+                        "Historic preservation waiver",
+                        "Building height variance"
+                    ],
+                    correct: 1
+                },
+                {
+                    question: "During which phase of Xircon's building process are necessary permits and approvals obtained?",
+                    options: [
+                        "New Home Selection",
+                        "New Home Confirmation",
+                        "Tender",
+                        "Post Contract"
+                    ],
+                    correct: 3
+                },
+                {
+                    question: "What is included in Xircon's post-construction service?",
+                    options: [
+                        "3-month maintenance inspection",
+                        "12-month maintenance period with 3-month inspection",
+                        "5-year structural warranty only",
+                        "Lifetime service agreement"
+                    ],
+                    correct: 1
+                },
+                {
+                    question: "What is Xircon's policy regarding variations after contract signing?",
+                    options: [
+                        "Unlimited variations allowed",
+                        "Up to three variations permitted",
+                        "No variations permitted",
+                        "Variations allowed with 25% surcharge"
+                    ],
+                    correct: 2
+                },
+                {
+                    question: "What is Xircon's rock removal assurance for first home buyers?",
+                    options: [
+                        "Free unlimited rock removal",
+                        "Rock removal at cost",
+                        "Flat fee of $1,500",
+                        "Site relocation if rocks are found"
+                    ],
+                    correct: 2
+                },
+                {
+                    question: "What type of building contract does Xircon use?",
+                    options: [
+                        "Cost Plus Contract",
+                        "HIA Fixed Price Contract",
+                        "Time and Materials Contract",
+                        "Progressive Payment Contract"
+                    ],
+                    correct: 1
+                },
+                {
+                    question: "What bonus does Xircon offer specifically for first home buyers?",
+                    options: [
+                        "Up to $50,000 in bonus upgrades",
+                        "Up to $70,000 in bonus upgrades",
+                        "Up to $90,000 in bonus upgrades",
+                        "Free landscaping package"
+                    ],
+                    correct: 2
+                },
+                {
+                    question: "What are the two main unique selling points that Xircon focuses on in their content?",
+                    options: [
+                        "Experience and technology",
+                        "Affordability and quality",
+                        "Speed and volume",
+                        "Design and innovation"
+                    ],
+                    correct: 1
+                },
+                {
+                    question: "What service does Xircon provide to help first home buyers with financing?",
+                    options: [
+                        "Direct loans",
+                        "Rent-to-own programs",
+                        "In-house loan specialists",
+                        "Government grant applications only"
+                    ],
+                    correct: 2
+                },
+                {
+                    question: "Who is responsible for performing the three-month maintenance inspection after home completion?",
+                    options: [
+                        "The client must schedule this with a third-party inspector",
+                        "Xircon Homes conducts this as part of their post-construction service",
+                        "Local council building inspectors",
+                        "The client's insurance company"
+                    ],
+                    correct: 1
+                },
+                {
+                    question: "What is the approximate timeframe from initial planning to contract signing at Xircon?",
+                    options: [
+                        "2-3 weeks",
+                        "4-8 weeks",
+                        "3-4 months",
+                        "6 months or more"
+                    ],
+                    correct: 1
+                },
+                {
+                    question: "What is the typical construction period for a single-story Xircon home?",
+                    options: [
+                        "10 weeks",
+                        "20 weeks",
+                        "30 weeks",
+                        "52 weeks"
+                    ],
+                    correct: 1
+                },
+                {
+                    question: "What additional step is required for knockdown rebuild projects that isn't needed for greenfield builds?",
+                    options: [
+                        "Special foundation reinforcement",
+                        "Asset Protection Permit",
+                        "Higher insurance coverage",
+                        "Heritage assessment"
+                    ],
+                    correct: 1
+                },
+                {
+                    question: "During which stage of Xircon's process would a client select fixtures, colors, and materials?",
+                    options: [
+                        "New Home Selection",
+                        "Tender",
+                        "Interior Design and Selections",
+                        "Contract"
+                    ],
+                    correct: 2
+                },
+                {
+                    question: "What is a Greenfield Site in Australian home building terminology?",
+                    options: [
+                        "Land that has never been built on before",
+                        "Land with excellent agricultural potential",
+                        "Land that has been previously developed but abandoned",
+                        "Land with significant natural vegetation"
+                    ],
+                    correct: 0
+                },
+                {
+                    question: "What is a 'Brownfield Site' in Australian building terminology?",
+                    options: [
+                        "Land with poor soil quality",
+                        "Land that requires environmental remediation",
+                        "Previously developed land that has been abandoned or underutilized",
+                        "Land designated for industrial use only"
+                    ],
+                    correct: 2
+                },
+                {
+                    question: "What is Lender's Mortgage Insurance (LMI) in Australian home financing?",
+                    options: [
+                        "Insurance that protects the homeowner if they can't make payments",
+                        "Insurance that protects the lender if the borrower defaults",
+                        "Insurance against structural defects",
+                        "Coverage for home contents"
+                    ],
+                    correct: 1
+                },
+                {
+                    question: "When is Lender's Mortgage Insurance typically required in Australia?",
+                    options: [
+                        "When the deposit is less than 10% of property value",
+                        "When the deposit is less than 15% of property value",
+                        "When the deposit is less than 20% of property value",
+                        "When the deposit is less than 25% of property value"
+                    ],
+                    correct: 2
+                },
+                {
+                    question: "What is a house and land package in Australia?",
+                    options: [
+                        "A combined offering where a builder has pre-selected land and matched it with suitable home designs",
+                        "A government program for first home buyers",
+                        "A special tax arrangement for property developers",
+                        "A real estate listing that includes furniture"
+                    ],
+                    correct: 0
+                },
+                {
+                    question: "What is conveyancing in the Australian property process?",
+                    options: [
+                        "The process of designing the home layout",
+                        "The legal process of transferring property ownership",
+                        "The physical measurement of the property",
+                        "The inspection process"
+                    ],
+                    correct: 1
+                },
+                {
+                    question: "What are covenants in Australian property development?",
+                    options: [
+                        "Financial agreements between builders and banks",
+                        "Rules restricting how you can build or modify your property",
+                        "Guarantees on building materials",
+                        "Contracts with utility providers"
+                    ],
+                    correct: 1
+                },
+                {
+                    question: "What is typically different about building in established areas vs. greenfield sites?",
+                    options: [
+                        "Established areas have no building regulations",
+                        "Established areas typically have existing infrastructure and may have space constraints",
+                        "Greenfield sites are always cheaper to build on",
+                        "Greenfield sites require no council approval"
+                    ],
+                    correct: 1
+                },
+                {
+                    question: "What is the typical maintenance period offered after home completion in the Australian building industry?",
+                    options: [
+                        "3 months",
+                        "6 months",
+                        "12 months",
+                        "24 months"
+                    ],
+                    correct: 2
+                },
+                {
+                    question: "What would be affected by an underground electricity pit application in a knockdown rebuild project?",
+                    options: [
+                        "The home's internal electrical wiring plans",
+                        "The timeline for electricity connection",
+                        "The positioning of the building on the block",
+                        "The tariff rate for electricity"
+                    ],
+                    correct: 1
                 }
-            }
+            ];
 
-            // Initialize quiz
-            function initializeQuiz() {
+            // Make functions available globally
+            window.selectQuiz = function(quizType) {
+                console.log('Quiz selected:', quizType); // Debug log
+                currentQuizKey = quizType === 'xircon' ? 'xirconQuizData' : 'quizData';
+                
+                // Initialize appropriate quiz data if it doesn't exist
+                if (quizType === 'general' && !localStorage.getItem('quizData')) {
+                    localStorage.setItem('quizData', JSON.stringify(defaultQuizData));
+                } else if (quizType === 'xircon' && !localStorage.getItem('xirconQuizData')) {
+                    localStorage.setItem('xirconQuizData', JSON.stringify(xirconQuizData));
+                }
+                
                 // Load quiz data
-                loadQuizData();
-                // Add event listeners
-                startButton.addEventListener('click', startQuiz);
-                nextButton.addEventListener('click', nextQuestion);
-                document.addEventListener('visibilitychange', handleVisibilityChange);
-                window.addEventListener('blur', handleWindowBlur);
-                window.addEventListener('focus', handleWindowFocus);
-                // Initialize welcome screen
-                welcomeScreen.classList.add('active');
-                quizScreen.classList.remove('active');
-                resultScreen.classList.remove('active');
-            }
-
-            // Start the quiz
-            function startQuiz() {
-                if (!quizData || quizData.length === 0) {
-                    alert('No questions available. Please add some questions first.');
-                    return;
+                const savedData = localStorage.getItem(currentQuizKey);
+                console.log('Saved data:', savedData); // Debug log
+                
+                if (savedData) {
+                    quizData = JSON.parse(savedData);
+                    if (quizData && quizData.length > 0) {
+                        // Show quiz section and start quiz
+                        document.getElementById('welcome-screen').classList.remove('active');
+                        document.getElementById('quiz-section').classList.add('active');
+                        startQuiz();
+                    } else {
+                        alert('No questions available for this quiz yet. Please add questions in the admin panel.');
+                    }
+                } else {
+                    alert('No questions available for this quiz yet. Please add questions in the admin panel.');
                 }
+            };
+
+            window.startQuiz = function() {
+                console.log('Starting quiz...'); // Debug log
+                // Reset quiz state
                 currentQuestion = 0;
                 score = 0;
                 selectedAnswers = [];
                 selectedOption = null;
                 tabChangeCount = 0;
                 isQuizActive = true;
-                welcomeScreen.classList.remove('active');
-                quizScreen.classList.add('active');
-                resultScreen.classList.remove('active');
-                loadQuestion();
+
+                // Show first question
+                showQuestion();
+                startTimer();
+
+                // Update progress bar
+                updateProgress();
+            };
+
+            window.nextQuestion = function() {
+                if (selectedOption === null) return;
+                
+                // Save answer
+                selectedAnswers[currentQuestion] = selectedOption;
+                if (selectedOption === quizData[currentQuestion].correct) {
+                    score++;
+                }
+                
+                // Clear timer
+                if (timer) clearInterval(timer);
+                
+                // Move to next question
+                currentQuestion++;
+                if (currentQuestion < quizData.length) {
+                    showQuestion();
+                    updateProgress();
+                } else {
+                    showResults();
+                }
+            };
+
+            function updateProgress() {
+                const progress = ((currentQuestion) / quizData.length) * 100;
+                document.getElementById('progress').style.width = `${progress}%`;
             }
 
-            // Load current question
-            function loadQuestion() {
-                if (!quizData || quizData.length === 0) {
-                    questionElement.textContent = "No questions available. Please add some questions first.";
-                    optionsElement.innerHTML = '';
-                    nextButton.disabled = true;
-                    return;
-                }
-                if (timer) clearInterval(timer);
-                const question = quizData[currentQuestion];
-                if (!question) {
-                    questionElement.textContent = "No more questions.";
-                    optionsElement.innerHTML = '';
-                    nextButton.disabled = true;
-                    return;
-                }
-                questionElement.textContent = question.question;
+            function showQuestion() {
+                console.log('Showing question:', currentQuestion); // Debug log
+                const current = quizData[currentQuestion];
+                
+                // Update question text
+                questionElement.textContent = current.question;
+                
+                // Clear previous options
                 optionsElement.innerHTML = '';
-                question.options.forEach((option, index) => {
-                    const optionElement = document.createElement('div');
-                    optionElement.className = 'option';
-                    optionElement.textContent = option;
-                    optionElement.addEventListener('click', () => selectAnswer(index));
-                    optionsElement.appendChild(optionElement);
+                
+                // Add new options
+                current.options.forEach((option, index) => {
+                    const button = document.createElement('div');
+                    button.className = 'option';
+                    button.textContent = option;
+                    button.onclick = () => selectAnswer(index);
+                    optionsElement.appendChild(button);
                 });
-                const progress = ((currentQuestion) / quizData.length) * 100;
-                progressBar.style.width = `${progress}%`;
+                
+                // Reset selected option
                 selectedOption = null;
+                
+                // Update next button state
                 nextButton.disabled = true;
+                nextButton.style.opacity = '0.5';
+                
+                // Start timer for this question
                 startTimer();
             }
 
-            // Timer functions
+            window.selectAnswer = function(index) {
+                // Remove previous selection
+                const options = document.querySelectorAll('.option');
+                options.forEach(option => option.classList.remove('selected'));
+                
+                // Add new selection
+                options[index].classList.add('selected');
+                selectedOption = index;
+                nextButton.disabled = false;
+                nextButton.style.opacity = '1';
+            };
+
             function startTimer() {
-                timeLeft = TIME_PER_QUESTION;
-                updateTimerDisplay();
+                if (timer) clearInterval(timer);
+                
+                const TIME_PER_QUESTION = 30;
+                let timeLeft = TIME_PER_QUESTION;
+                
+                // Update timer display
+                timerElement.textContent = timeLeft;
+                
                 timer = setInterval(() => {
                     timeLeft--;
-                    updateTimerDisplay();
+                    timerElement.textContent = timeLeft;
+                    
+                    if (timeLeft <= 5) {
+                        timerElement.classList.add('warning');
+                    }
+                    
                     if (timeLeft <= 0) {
                         clearInterval(timer);
                         nextQuestion();
                     }
                 }, 1000);
             }
-            function updateTimerDisplay() {
-                const timerElement = document.getElementById('timer');
-                timerElement.textContent = timeLeft;
-                if (timeLeft <= 5) {
-                    timerElement.classList.add('warning');
-                } else {
-                    timerElement.classList.remove('warning');
-                }
-            }
 
-            // Answer selection
-            function selectAnswer(index) {
-                const options = document.querySelectorAll('.option');
-                options.forEach(option => option.classList.remove('selected'));
-                options[index].classList.add('selected');
-                selectedOption = index;
-                nextButton.disabled = false;
-            }
-
-            // Next question
-            function nextQuestion() {
-                if (timer) clearInterval(timer);
-                if (selectedOption === null) {
-                    selectedAnswers[currentQuestion] = -1;
-                } else {
-                    selectedAnswers[currentQuestion] = selectedOption;
-                    if (selectedOption === quizData[currentQuestion].correct) {
-                        score++;
-                    }
-                }
-                currentQuestion++;
-                if (currentQuestion < quizData.length) {
-                    loadQuestion();
-                } else {
-                    showResults();
-                }
-            }
-
-            // Show results
             function showResults() {
-                document.getElementById('quiz-screen').classList.remove('active');
+                console.log('Showing results...'); // Debug log
+                // Hide quiz section
+                document.getElementById('quiz-section').classList.remove('active');
+                
+                // Show result screen
                 document.getElementById('result-screen').classList.add('active');
                 
-                // Calculate score and percentage
+                // Calculate final score
                 const totalQuestions = quizData.length;
                 const percentage = (score / totalQuestions) * 100;
                 
-                // Update final score display
-                finalScoreElement.textContent = `${score}/${totalQuestions} (${percentage.toFixed(1)}%)`;
+                // Update score display
+                scoreElement.textContent = `${score}/${totalQuestions} (${percentage.toFixed(1)}%)`;
                 
-                // Set result message based on score
+                // Prepare result message
                 let message = "";
                 let emoji = "";
-                
                 if (percentage >= 90) {
-                    message = "Outstanding! You're a true quiz master!";
+                    message = "Outstanding! You're a quiz master!";
                     emoji = "🏆";
                 } else if (percentage >= 80) {
-                    message = "Excellent! You have great knowledge!";
+                    message = "Excellent work!";
                     emoji = "🌟";
                 } else if (percentage >= 70) {
-                    message = "Very good! You're doing great!";
+                    message = "Very good!";
                     emoji = "👍";
                 } else if (percentage >= 60) {
-                    message = "Good job! You passed with flying colors!";
-                    emoji = "🎯";
-                } else if (percentage >= 50) {
-                    message = "Not bad! You're on the right track!";
+                    message = "Good effort!";
                     emoji = "💪";
                 } else {
-                    message = "Keep practicing! You'll get better!";
+                    message = "Keep practicing!";
                     emoji = "📚";
                 }
-
-                // Display detailed results
-                resultMessageElement.innerHTML = `
+                
+                // Update result message
+                resultMessage.innerHTML = `
                     <div class="result-details">
                         <p class="result-message">${emoji} ${message}</p>
                         <div class="score-breakdown">
-                            <p>Correct Answers: <span class="correct">${score}</span></p>
-                            <p>Incorrect Answers: <span class="incorrect">${totalQuestions - score}</span></p>
-                            <p>Success Rate: <span class="percentage">${percentage.toFixed(1)}%</span></p>
+                            <p>Total Questions: ${totalQuestions}</p>
+                            <p>Correct Answers: ${score}</p>
+                            <p>Success Rate: ${percentage.toFixed(1)}%</p>
                         </div>
                     </div>
                 `;
 
-                // Save final results
-                const finalResults = {
-                    score,
-                    totalQuestions,
-                    percentage,
-                    timestamp: new Date().toISOString()
+                // Save result to localStorage for admin panel
+                const quizResult = {
+                    timestamp: new Date().toISOString(),
+                    score: score,
+                    totalQuestions: totalQuestions,
+                    percentage: percentage,
+                    answers: selectedAnswers,
+                    questions: quizData.map(q => ({
+                        question: q.question,
+                        correctAnswer: q.options[q.correct]
+                    }))
                 };
-                localStorage.setItem('quizFinalResults', JSON.stringify(finalResults));
+
+                // Get existing results or initialize new array
+                const resultsKey = currentQuizKey + '_results';
+                const existingResults = JSON.parse(localStorage.getItem(resultsKey) || '[]');
+                existingResults.unshift(quizResult); // Add new result at the beginning
+                localStorage.setItem(resultsKey, JSON.stringify(existingResults));
             }
 
-            // Tab change detection
-            function handleVisibilityChange() {
-                if (document.hidden && isQuizActive) {
-                    handleTabChange();
-                }
-            }
-
-            function handleWindowBlur() {
-                if (isQuizActive) {
-                    handleTabChange();
-                }
-            }
-
-            function handleWindowFocus() {
-                if (isQuizActive) {
-                    // Reset the warning when returning to the quiz
-                    document.getElementById('tab-warning').style.display = 'none';
-                }
-            }
-
-            function handleTabChange() {
-                if (!isQuizActive) return;
-
-                tabChangeCount++;
+            window.restartQuiz = function() {
+                console.log('Restarting quiz...'); // Debug log
+                // Hide result screen
+                document.getElementById('result-screen').classList.remove('active');
                 
-                if (tabChangeCount >= MAX_TAB_CHANGES) {
-                    // Terminate quiz after maximum allowed tab changes
-                    terminateQuiz();
-                } else {
-                    // Show warning
-                    const warning = document.getElementById('tab-warning');
-                    warning.style.display = 'block';
-                    warning.textContent = `Warning! Tab change detected (${tabChangeCount}/${MAX_TAB_CHANGES}). Next change will end the quiz.`;
-                    
-                    // Hide warning after 5 seconds
-                    setTimeout(() => {
-                        warning.style.display = 'none';
-                    }, 5000);
-                }
-            }
-
-            function terminateQuiz() {
-                // Clear timer
-                if (timer) {
-                    clearInterval(timer);
-                }
-
-                // Show termination message
-                document.getElementById('quiz-screen').classList.remove('active');
-                document.getElementById('result-screen').classList.add('active');
+                // Show welcome screen
+                document.getElementById('welcome-screen').classList.add('active');
                 
-                // Update result display
-                document.getElementById('final-score').textContent = "Quiz Terminated";
-                document.getElementById('result-message').innerHTML = `
-                    <div class="result-details">
-                        <p class="result-message">⚠️ Quiz Terminated</p>
-                        <div class="score-breakdown">
-                            <p>Reason: Multiple tab changes detected</p>
-                            <p>Questions Completed: ${currentQuestion}/${quizData.length}</p>
-                            <p>Score: ${score}</p>
-                        </div>
-                    </div>
-                `;
-
-                // Disable restart button
-                const restartBtn = document.querySelector('#result-screen .btn');
-                restartBtn.disabled = true;
-                restartBtn.textContent = "Quiz Terminated";
-                restartBtn.style.opacity = "0.5";
-                restartBtn.style.cursor = "not-allowed";
-
-                isQuizActive = false;
-            }
-
-            // Admin form functions
-            function toggleAdminForm() {
-                const adminForm = document.getElementById('admin-form');
-                adminForm.classList.toggle('active');
-            }
-
-            function addOption() {
-                const optionsContainer = document.getElementById('options-container');
-                const optionCount = optionsContainer.children.length;
-                
-                const optionDiv = document.createElement('div');
-                optionDiv.className = 'option-input';
-                optionDiv.innerHTML = `
-                    <input type="text" placeholder="Option ${optionCount + 1}" required>
-                    <input type="radio" name="correct" value="${optionCount}" required>
-                    <button type="button" class="remove-option-btn" onclick="removeOption(this)">Remove</button>
-                `;
-                
-                optionsContainer.appendChild(optionDiv);
-            }
-
-            function removeOption(button) {
-                const optionsContainer = document.getElementById('options-container');
-                if (optionsContainer.children.length > 2) {
-                    button.parentElement.remove();
-                    // Update radio button values
-                    const radioButtons = document.querySelectorAll('input[type="radio"]');
-                    radioButtons.forEach((radio, index) => {
-                        radio.value = index;
-                    });
-                }
-            }
-
-            // Handle form submission
-            document.getElementById('question-form').addEventListener('submit', function(e) {
-                e.preventDefault();
-                
-                const question = document.getElementById('admin-question').value;
-                const options = Array.from(document.querySelectorAll('.option-input input[type="text"]'))
-                    .map(input => input.value);
-                const correct = parseInt(document.querySelector('input[name="correct"]:checked').value);
-                
-                // Create new question object
-                const newQuestion = {
-                    question,
-                    options,
-                    correct
-                };
-                
-                // Add to quiz data
-                quizData.push(newQuestion);
-                
-                // Save to localStorage
-                saveQuizData();
-                
-                // Reset form
-                this.reset();
-                
-                // Show success message
-                alert('Question added successfully!');
-                
-                // Close admin form
-                toggleAdminForm();
-            });
-
-            // Save quiz data to localStorage
-            function saveQuizData() {
-                localStorage.setItem('quizData', JSON.stringify(quizData));
-            }
-
-            // Restart the quiz
-            function restartQuiz() {
-                // Clear any existing timer
-                if (timer) {
-                    clearInterval(timer);
-                }
-                
-                // Clear saved progress
-                localStorage.removeItem('quizProgress');
-                
-                // Reset all quiz state variables
+                // Reset quiz state
                 currentQuestion = 0;
                 score = 0;
                 selectedAnswers = [];
                 selectedOption = null;
                 tabChangeCount = 0;
                 isQuizActive = false;
-                
-                // Reset UI elements
-                document.getElementById('result-screen').classList.remove('active');
-                document.getElementById('welcome-screen').classList.add('active');
-                
-                // Remove any added styles
-                const addedStyle = document.querySelector('style[data-quiz-style]');
-                if (addedStyle) {
-                    addedStyle.remove();
-                }
-            }
-
-            // Save user progress
-            function saveUserProgress() {
-                const progress = {
-                    currentQuestion,
-                    score,
-                    selectedAnswers,
-                    timestamp: new Date().toISOString()
-                };
-                localStorage.setItem('quizProgress', JSON.stringify(progress));
-            }
-
-            // Load user progress
-            function loadUserProgress() {
-                const savedProgress = localStorage.getItem('quizProgress');
-                if (savedProgress) {
-                    const progress = JSON.parse(savedProgress);
-                    currentQuestion = progress.currentQuestion;
-                    score = progress.score;
-                    selectedAnswers = progress.selectedAnswers;
-                    return true;
-                }
-                return false;
-            }
-
-            // Initialize quiz when page loads
-            initializeQuiz();
+            };
         });
     </script>
 </body>
-</html> 
+</html>
